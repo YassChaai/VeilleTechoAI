@@ -1,0 +1,32 @@
+# --- MVP (obligatoire) ---
+feedparser==6.0.11        # ingestion RSS
+requests==2.32.3          # ingestion API (Hacker News Algolia)
+PyYAML==6.0.2             # lecture de sources.yaml
+python-dotenv==1.0.1      # chargement du .env
+Flask==3.1.0              # dashboard (Jinja2 est inclus avec Flask)
+gunicorn>=23.0.0          # serveur WSGI de prod (bonus déploiement en ligne)
+
+# --- Mode IA (optionnel) ---
+# Le pipeline tourne SANS. Installé, il n'est actif que si ANTHROPIC_API_KEY est présente.
+anthropic>=0.69.0
+
+# --- Bonus recherche sémantique (optionnel, lourd : modèle ~80 Mo) ---
+# Décommenter pour activer, puis exporter SEMANTIC_SEARCH=1
+# sentence-transformers==3.3.1
+
+# --- Bonus traduction/vulgarisation FR en mode dégradé (LLM local gratuit, sans clé) ---
+# Backend 1 (recommandé) : Ollama — pas de dépendance pip, installer l'app + `ollama pull llama3.2:3b`
+# Backend 2 (hors-ligne, sans daemon) : décommenter la ligne ci-dessous
+# argostranslate>=1.9.6
+
+# --- Bonus qualité : extraction du texte intégral des pages (optionnel) ---
+# Active la vulgarisation depuis l'article entier (ENRICH_FULLTEXT=1). `uv add trafilatura`
+# trafilatura>=1.12.0
+
+# --- Bonus : découverte web de sources (optionnel) ---
+# Recherche web sans clé pour la couche DISCOVERY_WEB=1. `uv pip install ddgs`
+# ddgs>=6.0.0
+
+# --- Développement (tests) ---
+# uv add --dev pytest
+# pytest>=8.0.0

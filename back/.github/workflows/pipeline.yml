@@ -1,0 +1,38 @@
+name: Pipeline de veille (auto-alimentation)
+
+# Niveau "visé" de l'auto-alimentation : le pipeline tourne seul.
+on:
+  schedule:
+    - cron: "0 */6 * * *" # toutes les 6 heures
+  workflow_dispatch: {} # déclenchement manuel possible
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    # Le code back vit sous RENDU/back/ (le front Next est sous RENDU/front/).
+    defaults:
+      run:
+        working-directory: RENDU/back
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer le pipeline
+        env:
+          # Optionnel : ajouter le secret ANTHROPIC_API_KEY dans le dépôt pour le mode IA.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python main.py
+
+      - name: Publier la base mise à jour (artefact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: veille-db
+          path: RENDU/back/data/veille.db
+          if-no-files-found: warn

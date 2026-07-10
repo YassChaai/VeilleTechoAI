@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set active = 'settings' %}
+{% block title %}Réglages — Le Guetteur{% endblock %}
+
+{% block content %}
+  <h2>Préférences</h2>
+  <div class="note">
+    {% if logged_in %}
+      Préférences du compte <strong>{{ current_user.username }}</strong>. Mots-clés séparés par des
+      virgules : le dashboard réordonne alors les articles par pertinence pour toi.
+    {% else %}
+      Profil invité (partagé, sans compte). <a href="/login">Connecte-toi</a> pour des préférences
+      personnelles et le suivi de lecture. Mots-clés séparés par des virgules.
+    {% endif %}
+  </div>
+
+  {% if saved %}<div class="tag tag--relevance" style="margin-bottom:16px">Préférences enregistrées ✓</div>{% endif %}
+
+  <form method="post" action="/settings">
+    <textarea name="keywords" rows="4" style="width:100%"
+      placeholder="ex : intelligence artificielle, startup, accessibilité, rust">{{ keywords }}</textarea>
+    {% if logged_in %}
+      <label style="display:flex; gap:8px; align-items:center; margin-top:14px">
+        <input type="checkbox" name="hide_read" {{ 'checked' if hide_read }} style="width:auto">
+        Masquer par défaut les articles déjà lus dans la liste
+      </label>
+    {% endif %}
+    <div style="margin-top:14px"><button type="submit">Enregistrer</button></div>
+  </form>
+{% endblock %}

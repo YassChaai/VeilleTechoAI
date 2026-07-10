@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% set active = 'index' %}
+{% block title %}{{ a['title'] }} — Le Guetteur{% endblock %}
+
+{% block content %}
+  <p class="note"><a href="/">← Retour à la liste</a></p>
+
+  <article class="card">
+    <h2 style="margin-top:0">{{ a['title'] }}</h2>
+    <div class="meta">
+      <span class="tag tag--{{ domain_slug(a['category']) }}">{{ a['category'] or 'Non classé' }}</span>
+      <span>{{ a['source'] }}</span>
+      {% if a['published_at'] %}<span>· {{ a['published_at'][:10] }}</span>{% endif %}
+      {% if a['relevance'] %}<span class="tag tag--relevance">pertinence {{ (a['relevance'] * 100) | round | int }}%</span>{% endif %}
+    </div>
+
+    {% if logged_in %}
+      <div class="detail-actions">
+        <form method="post" action="/articles/{{ a['id'] }}/read">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="action" value="unread">
+          <button class="btn-ghost" type="submit">Marquer comme non lu</button>
+        </form>
+        {% if saved %}
+          <span class="muted">Enregistré{% if saved_folder_name %} · 📁 {{ saved_folder_name }}{% else %} · à lire{% endif %}</span>
+          <form method="post" action="/unsave/{{ a['id'] }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="btn-ghost" type="submit">Retirer</button>
+          </form>
+        {% else %}
+          <form method="post" action="/save/{{ a['id'] }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <select name="folder_id">
+              <option value="">À lire (sans dossier)</option>
+              {% for f in folders %}<option value="{{ f['id'] }}">{{ f['name'] }}</option>{% endfor %}
+            </select>
+            <input type="text" name="new_folder" placeholder="ou nouveau dossier…">
+            <button type="submit">☆ Enregistrer</button>
+          </form>
+        {% endif %}
+      </div>
+    {% else %}
+      <p class="note"><a href="/login?next=/article/{{ a['id'] }}">Connecte-toi</a> pour marquer cet article comme lu ou l'enregistrer pour plus tard.</p>
+    {% endif %}
+
+    <h3 class="section-title">Résumé</h3>
+    {% set summary_text = a['summary'] or (a['content'] or '')[:400] %}
+    {% if summary_text %}
+      {% for para in summary_text.split('\n') if para.strip() %}
+        <p>{{ para.strip() }}</p>
+      {% endfor %}
+    {% else %}
+      <p>—</p>
+    {% endif %}
+
+    {% if takeaways %}
+      <h3 class="section-title">Points à retenir</h3>
+      <ul>
+        {% for point in takeaways %}
+          <li style="margin-bottom:6px">{{ point }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if crossed > 0 %}
+      <h3 class="section-title">Également couvert par</h3>
+      <ul>
+        {% for d in dupes %}
+          <li><a href="{{ d['url'] }}" target="_blank" rel="noopener">{{ d['source'] }} — {{ d['title'] }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <p style="margin-top:22px">
+      <a class="btn-external" href="{{ a['url'] }}" target="_blank" rel="noopener">
+        Lire l'article officiel →
+      </a>
+    </p>
+    <p class="muted" style="font-size:12.5px">Pour approfondir, consultez la source d'origine.</p>
+  </article>
+{% endblock %}

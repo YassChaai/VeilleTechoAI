@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% set active = 'index' %}
+{% block title %}Articles — Le Guetteur{% endblock %}
+
+{% block content %}
+  <form class="toolbar" method="get" action="/">
+    <input type="search" name="q" value="{{ query }}" placeholder="Rechercher (titre, résumé)…">
+    <select name="domain" onchange="this.form.submit()">
+      <option value="">Tous les domaines</option>
+      {% for d in domains %}
+        <option value="{{ d }}" {{ 'selected' if current_domain == d }}>{{ d }}</option>
+      {% endfor %}
+    </select>
+    <select name="sort" onchange="this.form.submit()">
+      <option value="date" {{ 'selected' if sort == 'date' }}>Trier : Date</option>
+      <option value="relevance" {{ 'selected' if sort == 'relevance' }}>Trier : Pertinence</option>
+    </select>
+    {% if logged_in %}
+      <select name="read" onchange="this.form.submit()">
+        <option value="all" {{ 'selected' if read_filter == 'all' }}>Lecture : Tous</option>
+        <option value="unread" {{ 'selected' if read_filter == 'unread' }}>Lecture : Non lus</option>
+        <option value="read" {{ 'selected' if read_filter == 'read' }}>Lecture : Lus</option>
+      </select>
+    {% endif %}
+    <button type="submit">Filtrer</button>
+  </form>
+
+  <form id="ingest-form" class="toolbar" method="post" action="/articles/refresh">
+    <button id="ingest-btn" type="submit">⤓ Chercher de nouveaux articles</button>
+    <span class="muted" style="align-self:center">Récupère les derniers articles des sources actuelles (ingestion + résumé).</span>
+  </form>
+
+  <div id="ingest-progress" class="refresh-progress"{{ '' if ingest_running else ' hidden' }}>
+    <div class="refresh-progress__bar"><div id="ingest-fill" class="refresh-progress__fill"></div></div>
+    <div class="refresh-progress__meta">
+      <span id="ingest-phase">En cours…</span>
+      <span id="ingest-stats" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="note">
+    {{ articles|length }} article(s) affiché(s) · {{ total }} en base
+    {% if personalized %} · <span class="tag">reordonné par profil</span>{% endif %}
+    {% if not logged_in %} · <a href="/login">connecte-toi</a> pour suivre tes lectures et enregistrer des articles{% endif %}
+  </div>
+
+  {% if articles %}
+    {% for a in articles %}
+      {% set is_read = logged_in and a['id'] in read %}
+      <article class="card {{ 'card--read' if is_read }}">
+        <h3>
+          {% if logged_in %}<span class="read-dot {{ 'read-dot--on' if is_read }}"
+            title="{{ 'Lu' if is_read else 'Non lu' }}"></span>{% endif %}
+          <a href="/article/{{ a['id'] }}">{{ a['title'] }}</a>
+        </h3>
+        <div class="meta">
+          <span class="tag tag--{{ domain_slug(a['category']) }}">{{ a['category'] or 'Non classé' }}</span>
+          <span>{{ a['source'] }}</span>
+          {% if a['published_at'] %}<span>· {{ a['published_at'][:10] }}</span>{% endif %}
+          {% if a['relevance'] %}<span class="tag tag--relevance">pertinence {{ (a['relevance'] * 100) | round | int }}%</span>{% endif %}
+          {% if is_read %}<span class="tag">lu</span>{% endif %}
+        </div>
+        <div>{{ ((a['summary'] or a['content'] or '').split('\n')[0]) | truncate(220, True) or '—' }}</div>
+        {% if logged_in %}
+          <div class="card-actions">
+            {% if a['id'] in saved %}
+              <form method="post" action="/unsave/{{ a['id'] }}">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="btn-ghost" type="submit">★ Enregistré</button>
+              </form>
+            {% else %}
+              <form method="post" action="/save/{{ a['id'] }}">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="btn-ghost" type="submit">☆ Lire plus tard</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Aucun article. Lance d'abord le pipeline : <code>python main.py</code></p>
+  {% endif %}
+
+  <script>
+    (function () {
+      var form = document.getElementById('ingest-form');
+      var btn = document.getElementById('ingest-btn');
+      var box = document.getElementById('ingest-progress');
+      var fill = document.getElementById('ingest-fill');
+      var phase = document.getElementById('ingest-phase');
+      var stats = document.getElementById('ingest-stats');
+      if (!form) return;
+
+      function render(s) {
+        fill.style.width = (s.percent || 0) + '%';
+        phase.textContent = s.phase || '';
+        stats.textContent = (s.ingested || 0) + ' nouveaux · ' + (s.summarized || 0) + ' résumés';
+      }
+
+      function poll() {
+        fetch('/articles/refresh/status')
+          .then(function (r) { return r.json(); })
+          .then(function (s) {
+            render(s);
+            if (s.done) {
+              phase.textContent = 'Terminé · ' + (s.ingested || 0) + ' nouvel(s) article(s)';
+              setTimeout(function () { window.location.href = '/'; }, 1000);
+              return;
+            }
+            setTimeout(poll, 800);
+          })
+          .catch(function () { setTimeout(poll, 1200); });
+      }
+
+      function start() {
+        box.hidden = false;
+        if (btn) btn.disabled = true;
+        fill.style.width = '4%';
+        phase.textContent = 'Démarrage…';
+        stats.textContent = '';
+        fetch('/articles/refresh', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(function () { poll(); })
+          .catch(function () { poll(); });
+      }
+
+      form.addEventListener('submit', function (e) { e.preventDefault(); start(); });
+      {% if ingest_running %}poll();{% endif %}
+    })();
+  </script>
+{% endblock %}

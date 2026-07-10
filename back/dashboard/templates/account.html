@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% set active = 'account' %}
+{% block title %}Mon compte — Le Guetteur{% endblock %}
+
+{% block content %}
+  <h2>Mon compte</h2>
+
+  {% if msg == 'pwd' %}<div class="tag tag--relevance" style="margin-bottom:16px">Mot de passe mis à jour ✓</div>{% endif %}
+  {% if error %}<div class="auth-error" style="margin-bottom:16px">{{ error }}</div>{% endif %}
+
+  <article class="card">
+    <div class="meta">
+      <span class="tag">compte</span>
+      <span>{{ user['username'] }}</span>
+      {% if user['created_at'] %}<span>· membre depuis {{ user['created_at'][:10] }}</span>{% endif %}
+    </div>
+    <div class="account-stats">
+      <div class="stat"><span class="stat__num">{{ stats.read }}</span><span class="stat__label">lus</span></div>
+      <div class="stat"><span class="stat__num">{{ stats.saved }}</span><span class="stat__label">enregistrés</span></div>
+      <div class="stat"><span class="stat__num">{{ stats.folders }}</span><span class="stat__label">dossiers</span></div>
+    </div>
+    <p class="note" style="margin:12px 0 0">
+      <a href="/library">Ma bibliothèque</a> ·
+      <a href="/settings">Préférences (mots-clés, masquer les lus)</a>
+    </p>
+  </article>
+
+  <h3 class="section-title">Changer le mot de passe</h3>
+  <form method="post" action="/account/password" class="auth-card" style="margin:0">
+    <label>Mot de passe actuel
+      <input type="password" name="current" autocomplete="current-password" required>
+    </label>
+    <label>Nouveau mot de passe
+      <input type="password" name="new" autocomplete="new-password" required>
+    </label>
+    <label>Confirmer le nouveau mot de passe
+      <input type="password" name="confirm" autocomplete="new-password" required>
+    </label>
+    <div><button type="submit">Mettre à jour</button></div>
+  </form>
+
+  <h3 class="section-title">Session & compte</h3>
+  <div class="detail-actions" style="border:none; padding:0">
+    <form method="post" action="/logout">
+      <button class="btn-ghost" type="submit">Se déconnecter</button>
+    </form>
+    <form method="post" action="/account/delete"
+          onsubmit="return confirm('Supprimer définitivement ton compte et toutes tes données (lus, dossiers, articles enregistrés) ?');">
+      <button class="btn-ghost" type="submit"
+              style="color:var(--c-ux); border-color:color-mix(in srgb, var(--c-ux) 40%, transparent)">
+        Supprimer mon compte
+      </button>
+    </form>
+  </div>
+{% endblock %}

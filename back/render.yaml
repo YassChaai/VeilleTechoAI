@@ -1,0 +1,37 @@
+# Blueprint Render : un service web (dashboard « toujours actif ») + un cron
+# qui relance le pipeline (auto-alimentation). À placer à la racine du dépôt Git.
+#
+# ⚠️ Persistance : SQLite doit vivre sur un DISQUE PERSISTANT, sinon la base est
+# perdue à chaque redeploy. Le disque ci-dessous (offre payante requise) est monté
+# sur /var/data et la base y est pointée via VEILLE_DB. Le service web s'auto-alimente
+# au démarrage (python main.py) puis sert le dashboard.
+services:
+  - type: web
+    name: veille-tech
+    runtime: python
+    plan: starter          # un disque persistant nécessite une offre payante
+    buildCommand: pip install -r requirements.txt
+    # Ingestion au boot (peuple le disque) puis service WSGI.
+    startCommand: python main.py; gunicorn dashboard.app:app --bind 0.0.0.0:$PORT
+    disk:
+      name: veille-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: VEILLE_DB
+        value: /var/data/veille.db
+      # Ajouter ANTHROPIC_API_KEY dans le dashboard Render pour activer le mode IA.
+
+  # NB : sur Render, un cron est un service SÉPARÉ et NE PARTAGE PAS le disque du
+  # service web (les disques sont attachés à un seul service). Pour un rafraîchissement
+  # périodique portable, on privilégie GitHub Actions (.github/workflows/pipeline.yml),
+  # qui commit/relance le pipeline. Le cron ci-dessous n'est utile qu'avec un datastore
+  # partagé (ex. Postgres managé) — laissé à titre indicatif.
+  - type: cron
+    name: veille-pipeline
+    runtime: python
+    schedule: "0 */6 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py

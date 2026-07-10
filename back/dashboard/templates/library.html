@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% set active = 'library' %}
+{% block title %}Bibliothèque — Le Guetteur{% endblock %}
+
+{% macro saved_card(a) %}
+  <article class="card {{ 'card--read' if a['id'] in read }}">
+    <h3><a href="/article/{{ a['id'] }}">{{ a['title'] }}</a></h3>
+    <div class="meta">
+      <span class="tag tag--{{ domain_slug(a['category']) }}">{{ a['category'] or 'Non classé' }}</span>
+      <span>{{ a['source'] }}</span>
+      {% if a['id'] in read %}<span class="tag">lu</span>{% endif %}
+    </div>
+    <div class="card-actions">
+      <form method="post" action="/unsave/{{ a['id'] }}">
+        <input type="hidden" name="next" value="/library">
+        <button class="btn-ghost" type="submit">Retirer</button>
+      </form>
+    </div>
+  </article>
+{% endmacro %}
+
+{% block content %}
+  <h2>Bibliothèque</h2>
+  <div class="note">
+    Tes articles « à lire plus tard », rangés par dossier thématique — {{ total }} enregistré(s).
+  </div>
+
+  <form class="toolbar" method="post" action="/folders/create">
+    <input type="text" name="name" placeholder="Nouveau dossier (ex. « IA générative », « à lire ce week-end »)…">
+    <button type="submit">Créer un dossier</button>
+  </form>
+
+  {% if unfiled %}
+    <h3 class="section-title">À lire <span class="muted">({{ unfiled|length }})</span></h3>
+    {% for a in unfiled %}{{ saved_card(a) }}{% endfor %}
+  {% endif %}
+
+  {% for f in folders %}
+    <h3 class="section-title">
+      <span class="tag">📁 {{ f['name'] }}</span>
+      <span class="muted">({{ counts.get(f['id'], 0) }})</span>
+      <form method="post" action="/folders/{{ f['id'] }}/delete" class="inline-right">
+        <button class="btn-ghost" type="submit">Supprimer le dossier</button>
+      </form>
+    </h3>
+    {% for a in by_folder[f['id']] %}
+      {{ saved_card(a) }}
+    {% else %}
+      <p class="muted" style="margin-left:2px">Dossier vide — enregistre un article dedans depuis sa page.</p>
+    {% endfor %}
+  {% endfor %}
+
+  {% if not unfiled and not folders %}
+    <p class="empty">
+      Rien d'enregistré pour l'instant. Depuis un article, clique « ☆ Lire plus tard ».
+    </p>
+  {% endif %}
+{% endblock %}

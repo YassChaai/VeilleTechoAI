@@ -1,0 +1,39 @@
+# Config déclarative des sources de veille.
+# type      : rss | api   (api = connecteur Hacker News Algolia)
+# domain    : domaine par défaut (l'un des 4 exacts) attribué à l'ingestion,
+#             affiné ensuite par la couche résumé/catégorisation.
+# authority : score d'autorité éditoriale [0..1] (bonus : score de pertinence enrichi).
+#
+# Domaines valides :
+#   Tech · Business de la tech · Data & IA · UX & solutions numériques
+
+sources:
+  - name: TechCrunch
+    type: rss
+    url: https://techcrunch.com/feed/
+    domain: Business de la tech
+    authority: 0.80
+
+  - name: Hacker News
+    type: api
+    url: https://hn.algolia.com/api/v1/search?tags=story
+    domain: Tech
+    authority: 0.65
+
+  - name: arXiv cs.AI
+    type: rss
+    url: https://rss.arxiv.org/rss/cs.AI
+    domain: Data & IA
+    authority: 0.75
+
+  - name: Smashing Magazine
+    type: rss
+    url: https://www.smashingmagazine.com/feed/
+    domain: UX & solutions numériques
+    authority: 0.80
+
+  - name: Nielsen Norman Group
+    type: rss
+    url: https://www.nngroup.com/feed/rss/
+    domain: UX & solutions numériques
+    authority: 0.90

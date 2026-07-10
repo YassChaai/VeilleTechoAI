@@ -1,0 +1,239 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   Le Guetteur — Charte « Horizon clair » (portée depuis le dashboard Flask)
+   Tokens exposés en variables CSS, consommés par tailwind.config.ts.
+   ========================================================================= */
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: #f7f5f0; /* parchemin */
+    --card: #ffffff;
+    --card-foreground: #14213d;
+    --popover: #ffffff;
+    --popover-foreground: #14213d;
+
+    /* Texte */
+    --foreground: #14213d; /* encre marine */
+    --muted: #efebe3; /* fond neutre (chips, champs) */
+    --muted-foreground: #5b6472; /* gris ardoise */
+
+    /* Accent (bleu acier) */
+    --primary: #2a5d9f;
+    --primary-foreground: #ffffff;
+    --primary-strong: #1e4578;
+
+    --secondary: #efebe3;
+    --secondary-foreground: #14213d;
+
+    /* shadcn « accent » = survol neutre (≠ couleur de marque) */
+    --accent: #efebe3;
+    --accent-foreground: #14213d;
+
+    --destructive: #c2603a;
+    --destructive-foreground: #ffffff;
+
+    --border: #e2dcd0;
+    --input: #e2dcd0;
+    --ring: #2a5d9f;
+
+    --radius: 0.75rem;
+
+    /* Domaines (chips color-codées) */
+    --c-tech: #3b5ba5;
+    --c-business: #2e7d5b;
+    --c-data: #6d4aa0;
+    --c-ux: #c2603a;
+
+    /* Typo (aucune police externe) */
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+}
+
+/* Chips catégorie color-codées : fond teinté clair + texte/bord du ton plein. */
+@layer components {
+  .chip-domain {
+    @apply inline-flex items-center rounded-pill border px-2.5 py-0.5 text-[11px] font-semibold;
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+    white-space: nowrap; /* jamais d'enroulement → pas d'ovale multi-lignes */
+  }
+  .chip-tech {
+    color: var(--c-tech);
+    border-color: color-mix(in srgb, var(--c-tech) 34%, transparent);
+    background: color-mix(in srgb, var(--c-tech) 12%, transparent);
+  }
+  .chip-business {
+    color: var(--c-business);
+    border-color: color-mix(in srgb, var(--c-business) 34%, transparent);
+    background: color-mix(in srgb, var(--c-business) 12%, transparent);
+  }
+  .chip-data {
+    color: var(--c-data);
+    border-color: color-mix(in srgb, var(--c-data) 34%, transparent);
+    background: color-mix(in srgb, var(--c-data) 12%, transparent);
+  }
+  .chip-ux {
+    color: var(--c-ux);
+    border-color: color-mix(in srgb, var(--c-ux) 34%, transparent);
+    background: color-mix(in srgb, var(--c-ux) 12%, transparent);
+  }
+  .chip-none {
+    color: var(--muted-foreground);
+    background: var(--secondary);
+  }
+  .chip-relevance {
+    color: var(--primary-strong);
+    border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  /* Rendu Markdown du digest éditorial */
+  .markdown {
+    color: var(--foreground);
+    font-size: 15.5px;
+    line-height: 1.7;
+  }
+  .markdown > :first-child {
+    margin-top: 0;
+  }
+  .markdown h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+  }
+  .markdown h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .markdown h3 {
+    font-size: 15.5px;
+    font-weight: 600;
+    margin: 20px 0 8px;
+  }
+  .markdown p {
+    margin: 0 0 12px;
+  }
+  .markdown ul,
+  .markdown ol {
+    margin: 0 0 14px;
+    padding-left: 22px;
+  }
+  .markdown li {
+    margin: 4px 0;
+  }
+  .markdown a {
+    color: var(--primary);
+    font-weight: 500;
+  }
+  .markdown a:hover {
+    color: var(--primary-strong);
+  }
+  .markdown strong {
+    font-weight: 700;
+    color: var(--foreground);
+  }
+  .markdown blockquote {
+    margin: 0 0 14px;
+    padding: 4px 14px;
+    border-left: 3px solid var(--primary);
+    color: var(--muted-foreground);
+  }
+  .markdown hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 22px 0;
+  }
+  .markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--secondary);
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+
+  /* Teintes douces réutilisables (nav active, encart d'erreur) */
+  .tint-primary {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+  .tint-destructive {
+    background: color-mix(in srgb, var(--destructive) 12%, transparent);
+    border-color: color-mix(in srgb, var(--destructive) 34%, transparent);
+  }
+}
+
+/* =========================================================================
+   Easter egg 🌴 — « mode hallucination » (clic sur le logo Le Guetteur).
+   Activé/désactivé via la classe .trip sur <html> (components/trip-logo.tsx).
+   ========================================================================= */
+@keyframes trip-hue {
+  from { filter: hue-rotate(0deg) saturate(1.7) contrast(1.05); }
+  to   { filter: hue-rotate(360deg) saturate(1.7) contrast(1.05); }
+}
+@keyframes trip-text {
+  0%, 100% { font-size: 1em; letter-spacing: 0; }
+  25% { font-size: 1.4em; letter-spacing: 0.07em; }
+  50% { font-size: 0.78em; letter-spacing: -0.03em; }
+  75% { font-size: 1.2em; letter-spacing: 0.04em; }
+}
+@keyframes trip-wobble {
+  0%, 100% { transform: scale(1) rotate(0deg) skew(0deg); }
+  20% { transform: scale(1.07) rotate(1.2deg) skew(1deg); }
+  40% { transform: scale(0.92) rotate(-1.4deg) skew(-1.5deg); }
+  60% { transform: scale(1.09) rotate(0.9deg) skew(1deg); }
+  80% { transform: scale(0.96) rotate(-0.7deg) skew(-0.5deg); }
+}
+@keyframes trip-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toute la page ondule en couleur, sans fin. */
+html.trip body {
+  animation: trip-hue 4s linear infinite;
+}
+
+/* Le texte change de taille en permanence. */
+html.trip body h1, html.trip body h2, html.trip body h3,
+html.trip body p, html.trip body li, html.trip body a,
+html.trip body span, html.trip body button, html.trip body label,
+html.trip body th, html.trip body td {
+  animation: trip-text 2.6s ease-in-out infinite;
+  will-change: font-size;
+}
+
+/* Les composants se déforment en permanence. */
+html.trip body .shadow-card, html.trip body table,
+html.trip body input, html.trip body textarea, html.trip body img {
+  animation: trip-wobble 3.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Désynchronise tout le monde → chaos plutôt que pulsation à l'unisson. */
+html.trip body :nth-child(3n) { animation-duration: 3.3s; animation-delay: -0.5s; }
+html.trip body :nth-child(3n+1) { animation-duration: 2.1s; animation-delay: -1.2s; }
+html.trip body :nth-child(4n+2) { animation-duration: 4.1s; animation-delay: -0.9s; }
+
+/* Le logo, lui, part carrément en vrille. */
+html.trip header img {
+  animation: trip-spin 1.6s linear infinite !important;
+}

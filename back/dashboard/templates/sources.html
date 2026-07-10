@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% set active = 'sources' %}
+{% block title %}Sources — Le Guetteur{% endblock %}
+
+{% block content %}
+  <h2>Sources</h2>
+  <div class="note">
+    Le <strong>socle</strong> (5 sources justifiées) plus les sources <strong>découvertes</strong>
+    automatiquement. Chaque source est notée d'après la qualité réelle de ses articles ;
+    les découvertes chroniquement faibles sont <em>élaguées</em> (jamais le socle).
+  </div>
+
+  <form id="refresh-form" class="toolbar" method="post" action="/sources/refresh">
+    <button id="refresh-btn" type="submit" {{ 'disabled' if not discovery_enabled }}>🔄 Rafraîchir les sources</button>
+    {% if discovery_enabled %}
+      <span class="muted" style="align-self:center">Cherche de nouvelles sources et retire les doublons.</span>
+    {% else %}
+      <span class="muted" style="align-self:center">Découverte désactivée — active <code>SOURCE_DISCOVERY=1</code> (+ <code>DISCOVERY_WEB</code>/<code>DISCOVERY_LLM</code>) pour l'utiliser.</span>
+    {% endif %}
+  </form>
+
+  <div id="refresh-progress" class="refresh-progress"{{ '' if refresh_running else ' hidden' }}>
+    <div class="refresh-progress__bar"><div id="refresh-fill" class="refresh-progress__fill"></div></div>
+    <div class="refresh-progress__meta">
+      <span id="refresh-phase">En cours…</span>
+      <span id="refresh-stats" class="muted"></span>
+    </div>
+  </div>
+
+  {% if refreshed is not none %}
+    {% if refreshed == 'off' %}
+      <div class="tag" style="margin-bottom:16px">Découverte désactivée (SOURCE_DISCOVERY=1 requis).</div>
+    {% else %}
+      <div class="tag tag--relevance" style="margin-bottom:16px">Sources rafraîchies · {{ refreshed }} nouvelle(s) ajoutée(s).</div>
+    {% endif %}
+  {% endif %}
+
+  {% if sources %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Origine</th>
+            <th>Source</th>
+            <th>Domaine</th>
+            <th>Autorité</th>
+            <th>Qualité</th>
+            <th>État</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sources %}
+            <tr class="{{ 'row-off' if not s['active'] }}">
+              <td>
+                {% if s['origin'] == 'static' %}
+                  <span class="tag">socle</span>
+                {% else %}
+                  <span class="tag tag--relevance">découverte</span>
+                {% endif %}
+              </td>
+              <td><a href="{{ s['url'] }}" target="_blank" rel="noopener">{{ s['name'] }}</a></td>
+              <td>
+                {% if s['domain'] %}
+                  <span class="tag tag--{{ domain_slug(s['domain']) }}">{{ s['domain'] }}</span>
+                {% else %}<span class="muted">—</span>{% endif %}
+              </td>
+              <td class="num">{{ (s['authority'] * 100) | round | int }}%</td>
+              <td>
+                <span class="meter">
+                  <span class="meter__track">
+                    <span class="meter__fill" style="width: {{ (s['quality'] * 100) | round | int }}%"></span>
+                  </span>
+                  {{ (s['quality'] * 100) | round | int }}%
+                </span>
+              </td>
+              <td>
+                {% if s['active'] %}actif{% else %}<span class="state-off">élaguée</span>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">
+      Aucune source en base. Lance <code>python main.py</code> (socle) puis
+      <code>SOURCE_DISCOVERY=1 python main.py discover</code> (découverte).
+    </p>
+  {% endif %}
+
+  <script>
+    (function () {
+      var form = document.getElementById('refresh-form');
+      var btn = document.getElementById('refresh-btn');
+      var box = document.getElementById('refresh-progress');
+      var fill = document.getElementById('refresh-fill');
+      var phase = document.getElementById('refresh-phase');
+      var stats = document.getElementById('refresh-stats');
+      if (!form) return;
+
+      function render(s) {
+        fill.style.width = (s.percent || 0) + '%';
+        phase.textContent = s.phase || '';
+        var parts = [(s.found || 0) + ' flux trouvés', (s.validated || 0) + ' validés',
+                     (s.added || 0) + ' ajoutés'];
+        if (s.removed) parts.push(s.removed + ' doublons retirés');
+        stats.textContent = parts.join(' · ');
+      }
+
+      function poll() {
+        fetch('/sources/refresh/status')
+          .then(function (r) { return r.json(); })
+          .then(function (s) {
+            render(s);
+            if (s.done) {
+              phase.textContent = 'Terminé · ' + (s.added || 0) + ' ajoutée(s), '
+                + (s.removed || 0) + ' doublon(s) retiré(s)';
+              setTimeout(function () {
+                window.location.href = '/sources?refreshed=' + (s.added || 0);
+              }, 1000);
+              return;
+            }
+            setTimeout(poll, 800);
+          })
+          .catch(function () { setTimeout(poll, 1200); });
+      }
+
+      function start() {
+        box.hidden = false;
+        if (btn) btn.disabled = true;
+        fill.style.width = '4%';
+        phase.textContent = 'Démarrage…';
+        stats.textContent = '';
+        fetch('/sources/refresh', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(function () { poll(); })
+          .catch(function () { poll(); });
+      }
+
+      form.addEventListener('submit', function (e) { e.preventDefault(); start(); });
+      {% if refresh_running %}poll();{% endif %}
+    })();
+  </script>
+{% endblock %}

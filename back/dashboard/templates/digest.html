@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set active = 'digest' %}
+{% block title %}Digest hebdo — Le Guetteur{% endblock %}
+
+{% block content %}
+  <h2>Digest — 7 derniers jours</h2>
+  <div class="note">Groupé par domaine, trié par nombre de sources croisées puis par date.</div>
+
+  {% if digest %}
+    {% for domain, items in digest.items() %}
+      <h3 class="section-title">
+        <span class="tag tag--{{ domain_slug(domain) }}">{{ domain }}</span>
+        <span class="muted">({{ items|length }})</span>
+      </h3>
+      {% for crossed, a in items %}
+        <article class="card">
+          <h3><a href="/article/{{ a['id'] }}">{{ a['title'] }}</a></h3>
+          <div class="meta">
+            {{ a['source'] }}
+            {% if a['published_at'] %} · {{ a['published_at'][:10] }}{% endif %}
+            {% if crossed > 0 %} · <span class="tag">{{ crossed }} source(s) croisée(s)</span>{% endif %}
+          </div>
+          <div>{{ ((a['summary'] or a['content'] or '').split('\n')[0]) | truncate(220, True) or '—' }}</div>
+        </article>
+      {% endfor %}
+    {% endfor %}
+  {% else %}
+    <p class="empty">Rien à afficher cette semaine. Lance <code>python main.py</code>.</p>
+  {% endif %}
+{% endblock %}

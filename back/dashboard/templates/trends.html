@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% set active = 'trends' %}
+{% block title %}Tendances — Le Guetteur{% endblock %}
+
+{% block content %}
+  <h2>Tendances &amp; signaux faibles</h2>
+  <div class="note">
+    Termes analysés sur les {{ recent_days }} derniers jours, comparés à la baseline (30 j).
+  </div>
+
+  <h3 class="section-title">📈 Tendances (termes qui montent)</h3>
+  {% if trends %}
+    {% for t in trends %}
+      <article class="card">
+        <div>
+          <strong>{{ t.term }}</strong>
+          &nbsp;<span class="tag">{{ t.recent }} mentions</span>
+          {% if t.lift >= 2 %}&nbsp;<span class="tag">×{{ t.lift }} vs baseline</span>{% endif %}
+          &nbsp;<span class="muted">· {{ t.sources }} source(s)</span>
+        </div>
+        {% if t.example %}
+          <div class="meta" style="margin-top:8px">
+            ex. <a href="/article/{{ t.example.id }}">{{ t.example.title }}</a>
+          </div>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Pas assez de données récentes. Lance <code>python main.py</code>.</p>
+  {% endif %}
+
+  <h3 class="section-title">🌱 Signaux faibles (émergents)</h3>
+  {% if weak %}
+    {% for t in weak %}
+      <article class="card">
+        <div>
+          <strong>{{ t.term }}</strong>
+          &nbsp;<span class="tag">nouveau</span>
+          &nbsp;<span class="muted">{{ t.recent }} mention(s) · {{ t.sources }} source(s)</span>
+        </div>
+        {% if t.example %}
+          <div class="meta" style="margin-top:8px">
+            ex. <a href="/article/{{ t.example.id }}">{{ t.example.title }}</a>
+          </div>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Aucun signal faible détecté sur la période.</p>
+  {% endif %}
+{% endblock %}

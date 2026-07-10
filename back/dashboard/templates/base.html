@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Le Guetteur{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Le Guetteur — accueil">
+      <img class="brand__mark" src="{{ url_for('static', filename='logo.png') }}" alt="">
+      <span class="brand__text">
+        <span class="brand__name">Le Guetteur</span>
+      </span>
+    </a>
+    <nav class="site-nav">
+      <a href="/" class="{{ 'active' if active=='index' }}">Articles</a>
+      <a href="/trends" class="{{ 'active' if active=='trends' }}">Tendances</a>
+      <a href="/digest" class="{{ 'active' if active=='digest' }}">Digest</a>
+      <a href="/sources" class="{{ 'active' if active=='sources' }}">Sources</a>
+      {% if current_user %}<a href="/library" class="{{ 'active' if active=='library' }}">Bibliothèque</a>{% endif %}
+      <a href="/settings" class="{{ 'active' if active=='settings' }}">Réglages</a>
+      {% if current_user %}<a href="/account" class="{{ 'active' if active=='account' }}">Mon compte</a>{% endif %}
+    </nav>
+    <div class="site-auth">
+      {% if current_user %}
+        <a class="site-auth__user" href="/account">{{ current_user.username }}</a>
+        <form method="post" action="/logout">
+          <button class="btn-ghost" type="submit">Déconnexion</button>
+        </form>
+      {% else %}
+        <a href="/login">Connexion</a>
+        <a class="btn-mini" href="/register">Créer un compte</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <span class="brand__name">Le Guetteur</span> — veille technologique auto-alimentée
+  </footer>
+</body>
+</html>

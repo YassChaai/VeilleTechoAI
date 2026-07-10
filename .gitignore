@@ -1,0 +1,24 @@
+# Racine RENDU/ — filet de sécurité pour `git init` ici (les sous-dossiers
+# back/ et front/ ont leurs propres .gitignore plus détaillés).
+
+# Environnements Python (dont le .venv orphelin à la racine RENDU/)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Secrets / env
+.env
+**/.env
+!**/.env.example
+
+# Base de données locale (reconstruite au build en prod)
+**/data/*.db
+**/data/*.db-journal
+
+# Node / build Next
+node_modules/
+.next/
+
+# OS
+.DS_Store

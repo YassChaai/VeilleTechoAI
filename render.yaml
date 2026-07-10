@@ -1,0 +1,63 @@
+# =============================================================================
+# Blueprint Render — « Le Guetteur » : TOUT sur Render, en deux services web.
+#
+#   • le-guetteur-api   → back Python/Flask (dashboard Jinja + API JSON /api/*)
+#   • le-guetteur-front → front Next.js, proxifie /api vers le back (BACKEND_URL)
+#
+# À placer à la RACINE du dépôt Git connecté à Render. Ici la racine = RENDU/
+# (elle contient back/ et front/). Si tu pousses MINI-PROJET/ à la place, préfixe
+# les rootDir par RENDU/ (ex. `rootDir: RENDU/back`).
+#
+# Déploiement : Render → New + → Blueprint → connecte le repo → Apply.
+# Détails et alternative « à la main » : voir DEPLOY.md.
+# =============================================================================
+services:
+  # --- Back : pipeline + Flask (Jinja + API JSON) ---------------------------
+  - type: web
+    name: le-guetteur-api
+    runtime: python
+    rootDir: back
+    plan: free
+    region: frankfurt
+    # Ingestion au BUILD : la base SQLite est peuplée dans le filesystem servi
+    # ensuite → le port se lie immédiatement au démarrage (pas de timeout de
+    # health check). Chaque redeploy = base ré-alimentée avec de vrais articles.
+    buildCommand: pip install -r requirements.txt && python main.py
+    startCommand: gunicorn dashboard.app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: VEILLE_DB
+        value: data/veille.db
+      - key: SECRET_KEY            # signe les cookies de session Flask (généré)
+        generateValue: true
+      - key: TRANSLATE_BACKEND     # pas d'Ollama en cloud → on n'essaie même pas
+        value: "off"
+      - key: REQUIRE_LLM_SUMMARY   # 0 = garde un résumé extractif si aucun LLM
+        value: "0"
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-8
+      - key: ANTHROPIC_API_KEY     # OPTIONNEL (secret) : résumés/catégo/FR par Claude
+        sync: false                # à saisir dans le dashboard Render, pas dans le repo
+
+  # --- Front : Next.js (App Router) -----------------------------------------
+  - type: web
+    name: le-guetteur-front
+    runtime: node
+    rootDir: front
+    plan: free
+    region: frankfurt
+    # --include=dev : Render peut poser NODE_ENV=production → sans ça, tailwind/
+    # typescript (devDependencies) ne s'installent pas et le build échoue.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20.11.1"
+      # ⚠️ DOIT correspondre à l'URL PUBLIQUE réelle du service API ci-dessus.
+      # Render nomme l'URL d'après le service ; vérifie-la après le 1er déploiement
+      # et corrige ici si un suffixe a été ajouté. Le scheme https:// est requis.
+      - key: BACKEND_URL
+        value: https://le-guetteur-api.onrender.com

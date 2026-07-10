@@ -1,0 +1,3 @@
+# Plateformes type Railway / Render / Heroku (buildpack Python + requirements.txt).
+release: python main.py
+web: gunicorn dashboard.app:app --bind 0.0.0.0:$PORT
