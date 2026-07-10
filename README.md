@@ -5,6 +5,8 @@ Elle ingère automatiquement de l'actualité, la **déduplique**, la **vulgarise
 **catégorise**, et l'affiche dans un **dashboard filtrable**. Tout le pipeline se relance en une
 commande (`python main.py`).
 
+Lien : https://le-guetteur-front.onrender.com/
+
 ## Structure du rendu
 
 ```
