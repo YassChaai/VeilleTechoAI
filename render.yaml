@@ -36,8 +36,8 @@ services:
         value: "off"
       - key: REQUIRE_LLM_SUMMARY   # 0 = garde un résumé extractif si aucun LLM
         value: "0"
-      - key: ANTHROPIC_MODEL
-        value: claude-opus-4-8
+      - key: ANTHROPIC_MODEL   # Haiku 4.5 : ~15× moins cher qu'Opus, suffisant pour du résumé
+        value: claude-haiku-4-5-20251001   # alt. qualité : claude-sonnet-5 / claude-opus-4-8
       - key: ANTHROPIC_API_KEY     # OPTIONNEL (secret) : résumés/catégo/FR par Claude
         sync: false                # à saisir dans le dashboard Render, pas dans le repo
 
