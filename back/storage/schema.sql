@@ -30,10 +30,17 @@ CREATE TABLE IF NOT EXISTS profile (     -- bonus personnalisation, un seul prof
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS settings (    -- réglages globaux clé/valeur (ex. modèle Claude choisi à chaud)
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS users (       -- comptes (multi-utilisateur)
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    anthropic_key TEXT,                  -- clé Claude perso (BYOK), optionnelle
+    anthropic_model TEXT,                -- modèle Claude choisi par ce compte, optionnel
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 

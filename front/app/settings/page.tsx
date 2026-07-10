@@ -1,38 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { api, type ModelChoice } from "@/lib/api";
+import { ApiKeyManager } from "@/components/api-key-manager";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function SettingsPage() {
   const [keywords, setKeywords] = useState("");
   const [hideRead, setHideRead] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [model, setModel] = useState("");
+  const [models, setModels] = useState<ModelChoice[]>([]);
+  const [iaEnabled, setIaEnabled] = useState(false);
+  const [hasKey, setHasKey] = useState(false);
+  const [keyHint, setKeyHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    api
-      .getSettings()
-      .then((s) => {
-        setKeywords(s.keywords);
-        setHideRead(s.hide_read);
-        setLoggedIn(s.logged_in);
-      })
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    const s = await api.getSettings();
+    setKeywords(s.keywords);
+    setHideRead(s.hide_read);
+    setLoggedIn(s.logged_in);
+    setModel(s.model);
+    setModels(s.models);
+    setIaEnabled(s.ia_enabled);
+    setHasKey(s.has_api_key);
+    setKeyHint(s.api_key_hint);
   }, []);
+
+  useEffect(() => {
+    load()
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [load]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setSaved(false);
     try {
-      await api.saveSettings(keywords, hideRead);
+      await api.saveSettings(keywords, hideRead, model);
       setSaved(true);
     } finally {
       setBusy(false);
@@ -50,6 +70,7 @@ export default function SettingsPage() {
       {loading ? (
         <Skeleton className="h-48 w-full" />
       ) : (
+        <>
         <form onSubmit={submit} className="space-y-6">
           <div className="grid gap-2">
             <Label htmlFor="keywords">Mots-clés prioritaires (séparés par des virgules)</Label>
@@ -61,6 +82,30 @@ export default function SettingsPage() {
               onChange={(e) => setKeywords(e.target.value)}
             />
           </div>
+
+          {iaEnabled && (
+            <div className="grid gap-2 rounded-lg border border-border bg-card p-4">
+              <Label htmlFor="model" className="text-foreground">
+                Modèle Claude (résumé & titres)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Appliqué au prochain « Chercher de nouveaux articles » — aucun redéploiement
+                nécessaire. N&apos;affecte que les nouveaux articles.
+              </p>
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger id="model" className="w-full sm:w-auto sm:min-w-[280px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.label} — {m.hint}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {loggedIn && (
             <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
@@ -88,6 +133,16 @@ export default function SettingsPage() {
             </p>
           )}
         </form>
+
+        {loggedIn && (
+          <section className="mt-8">
+            <h3 className="mb-3 border-b border-border pb-2 text-[15px] font-semibold">
+              Clé API Anthropic (BYOK)
+            </h3>
+            <ApiKeyManager hasKey={hasKey} hint={keyHint} onChanged={load} />
+          </section>
+        )}
+        </>
       )}
     </div>
   );

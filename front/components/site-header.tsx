@@ -45,22 +45,24 @@ export function SiteHeader() {
     <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border bg-card px-5 py-3">
       <TripLogo />
 
-      <nav className="flex flex-wrap gap-1">
-        {nav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "rounded-pill px-3 py-1.5 text-sm font-medium hover:no-underline",
-              isActive(pathname, item.href)
-                ? "tint-primary text-primary"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-            )}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      {user && (
+        <nav className="flex flex-wrap gap-1">
+          {nav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "rounded-pill px-3 py-1.5 text-sm font-medium hover:no-underline",
+                isActive(pathname, item.href)
+                  ? "tint-primary text-primary"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       <div className="ml-auto flex items-center gap-3 text-[13.5px]">
         {user ? (

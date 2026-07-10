@@ -123,8 +123,9 @@ def _articles_index(articles: list) -> str:
 def _claude_digest(prompt: str) -> str:
     import anthropic
 
-    client = anthropic.Anthropic()
-    model = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
+    # Clé + modèle du compte déclencheur (BYOK), comme le pipeline.
+    client = anthropic.Anthropic(api_key=summarize.current_api_key())
+    model = summarize.current_model()
     resp = client.messages.create(
         model=model, max_tokens=4000, system=_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
@@ -198,8 +199,19 @@ def _empty_digest(start: str, end: str) -> str:
 
 # --- Orchestration ----------------------------------------------------------
 
-def generate(conn, week_start: str | None = None):
-    """Génère (ou régénère) le digest d'une semaine et l'enregistre. Retourne la ligne."""
+def generate(conn, week_start: str | None = None, *, api_key=None, model=None,
+             translate_backend=None, require_llm=None):
+    """Génère (ou régénère) le digest d'une semaine et l'enregistre. Retourne la ligne.
+
+    Selon le compte déclencheur (BYOK), comme le pipeline : `api_key`/`model` → Claude ;
+    `translate_backend='auto'` → tente Ollama (mode gratuit). `require_llm` ignoré ici
+    (le digest a toujours un repli dégradé). None → valeurs d'environnement (CLI)."""
+    # Applique la clé/modèle/backend du compte avant de choisir le backend de rédaction.
+    summarize.set_api_key(api_key)
+    if api_key:
+        summarize.set_model(model or db.get_setting(conn, "anthropic_model"))
+    translate.set_backend_override(translate_backend)
+
     start, end = week_bounds(week_start)
     articles = db.articles_for_week(conn, start, end)
 
@@ -214,7 +226,8 @@ def generate(conn, week_start: str | None = None):
     content, model = None, None
     if summarize.ia_enabled():
         try:
-            content, model = _claude_digest(prompt), "Claude"
+            content = _claude_digest(prompt)
+            model = "Claude · " + summarize.model_label(summarize.current_model())
         except Exception as exc:
             print(f"[digest] Claude indisponible ({exc})")
     if not content and translate.has_generative_llm():

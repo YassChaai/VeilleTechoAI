@@ -30,6 +30,20 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
 _available: bool | None = None
 _argos_ready: bool = False
+_backend_override: str | None = None
+
+
+def set_backend_override(name: str | None) -> None:
+    """Force le backend de traduction pour ce run (ex. 'auto' pour tenter Ollama en
+    mode gratuit d'un compte), sinon on lit TRANSLATE_BACKEND. Invalide la mémo."""
+    global _backend_override, _available
+    _backend_override = (name or "").strip().lower() or None
+    _available = None
+
+
+def ollama_status() -> dict:
+    """État d'Ollama, indépendant de TRANSLATE_BACKEND (pour l'onboarding)."""
+    return {"available": _ollama_up(), "model": OLLAMA_MODEL, "host": OLLAMA_HOST}
 
 
 def _ollama_up() -> bool:
@@ -50,7 +64,7 @@ def _argos_importable() -> bool:
 
 def backend() -> str:
     """Backend effectif : 'ollama', 'argos' ou 'none'."""
-    forced = os.getenv("TRANSLATE_BACKEND", "auto").lower()
+    forced = _backend_override or os.getenv("TRANSLATE_BACKEND", "auto").lower()
     if forced == "ollama":
         return "ollama" if _ollama_up() else "none"
     if forced == "argos":

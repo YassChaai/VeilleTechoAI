@@ -5,6 +5,7 @@ PyYAML==6.0.2             # lecture de sources.yaml
 python-dotenv==1.0.1      # chargement du .env
 Flask==3.1.0              # dashboard (Jinja2 est inclus avec Flask)
 gunicorn>=23.0.0          # serveur WSGI de prod (bonus déploiement en ligne)
+cryptography>=42.0.0      # chiffre au repos les clés API par compte (BYOK) ; absente → repli clair
 
 # --- Mode IA (optionnel) ---
 # Le pipeline tourne SANS. Installé, il n'est actif que si ANTHROPIC_API_KEY est présente.

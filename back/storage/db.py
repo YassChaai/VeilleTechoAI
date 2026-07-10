@@ -6,6 +6,8 @@ import os
 import sqlite3
 from pathlib import Path
 
+from storage import crypto
+
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
@@ -42,6 +44,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ):
         if col not in cols:
             conn.execute(f"ALTER TABLE articles ADD COLUMN {col} {decl}")
+
+    # BYOK : clé + modèle Claude perso par compte (bases users antérieures).
+    ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+    if "anthropic_key" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN anthropic_key TEXT")
+    if "anthropic_model" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN anthropic_model TEXT")
 
 
 # --- Ingestion --------------------------------------------------------------
@@ -364,6 +373,24 @@ def get_duplicates(conn: sqlite3.Connection, canonical_id: int) -> list[sqlite3.
     ).fetchall()
 
 
+# --- Réglages globaux (clé/valeur) -----------------------------------------
+
+def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row and row["value"] is not None else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO settings (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (key, value),
+    )
+    conn.commit()
+
+
 # --- Profil (bonus personnalisation) ---------------------------------------
 
 def get_profile_keywords(conn: sqlite3.Connection) -> str:
@@ -412,6 +439,39 @@ def get_user(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
 def update_password(conn: sqlite3.Connection, user_id: int, password_hash: str) -> None:
     conn.execute(
         "UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id)
+    )
+    conn.commit()
+
+
+def get_user_api_key(conn: sqlite3.Connection, user_id: int) -> str | None:
+    """Clé Claude perso du compte (BYOK), déchiffrée, ou None."""
+    row = conn.execute(
+        "SELECT anthropic_key FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    stored = row["anthropic_key"] if row and row["anthropic_key"] else None
+    return crypto.decrypt(stored)
+
+
+def set_user_api_key(conn: sqlite3.Connection, user_id: int, key: str | None) -> None:
+    """Enregistre (chiffrée) ou retire (None/vide) la clé Claude du compte."""
+    conn.execute(
+        "UPDATE users SET anthropic_key = ? WHERE id = ?",
+        (crypto.encrypt(key or None), user_id),
+    )
+    conn.commit()
+
+
+def get_user_model(conn: sqlite3.Connection, user_id: int) -> str | None:
+    """Modèle Claude choisi par le compte, ou None (→ réglage global / défaut)."""
+    row = conn.execute(
+        "SELECT anthropic_model FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    return row["anthropic_model"] if row and row["anthropic_model"] else None
+
+
+def set_user_model(conn: sqlite3.Connection, user_id: int, model: str | None) -> None:
+    conn.execute(
+        "UPDATE users SET anthropic_model = ? WHERE id = ?", (model or None, user_id)
     )
     conn.commit()
 

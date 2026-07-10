@@ -34,12 +34,16 @@ services:
         generateValue: true
       - key: TRANSLATE_BACKEND     # pas d'Ollama en cloud → on n'essaie même pas
         value: "off"
-      - key: REQUIRE_LLM_SUMMARY   # 0 = garde un résumé extractif si aucun LLM
-        value: "0"
-      - key: ANTHROPIC_MODEL   # Haiku 4.5 : ~15× moins cher qu'Opus, suffisant pour du résumé
+      - key: REQUIRE_LLM_SUMMARY   # BYOK pur : 1 = jamais d'anglais extractif. Sans clé au
+        value: "1"                 # build → aucun résumé → purge → base vide. Un compte à clé
+                                   # la remplit en 100% FR/Claude au 1er « Chercher des articles ».
+      - key: ANTHROPIC_MODEL   # défaut global (invités / fallback) — Haiku, le moins cher
         value: claude-haiku-4-5-20251001   # alt. qualité : claude-sonnet-5 / claude-opus-4-8
-      - key: ANTHROPIC_API_KEY     # OPTIONNEL (secret) : résumés/catégo/FR par Claude
-        sync: false                # à saisir dans le dashboard Render, pas dans le repo
+      # BYOK pur : PAS de clé serveur. Chaque compte apporte la sienne (Réglages / inscription),
+      # utilisée quand CE compte lance « Chercher de nouveaux articles ».
+      # (Pour repasser en hybride : décommenter et saisir la clé en secret dans Render.)
+      # - key: ANTHROPIC_API_KEY
+      #   sync: false
 
   # --- Front : Next.js (App Router) -----------------------------------------
   - type: web

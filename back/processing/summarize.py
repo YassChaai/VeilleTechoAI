@@ -109,7 +109,7 @@ def _degraded(title: str, content: str, default: str | None) -> dict:
     #    REQUIRE_LLM_SUMMARY=1 : on REFUSE d'écrire un résumé anglais qui persisterait
     #    → on renvoie None, l'article reste EN ATTENTE et sera retenté au prochain run
     #    (quand le LLM est de nouveau dispo). Sinon, repli extractif assumé (mode sans LLM).
-    if os.getenv("REQUIRE_LLM_SUMMARY") == "1":
+    if _require_llm():
         return None
 
     summary = _extractive_summary(title, content)
@@ -123,9 +123,39 @@ def _degraded(title: str, content: str, default: str | None) -> dict:
 
 # --- Mode IA ----------------------------------------------------------------
 
+# Clé posée par le pipeline : celle du compte qui déclenche le run (BYOK) prime,
+# sinon ANTHROPIC_API_KEY (env). Process-global : un seul run à la fois (job gardé).
+_KEY_OVERRIDE: str | None = None
+
+
+def set_api_key(key: str | None) -> None:
+    """Force la clé Claude pour ce run (clé du compte déclencheur), ou None → env."""
+    global _KEY_OVERRIDE
+    _KEY_OVERRIDE = key or None
+
+
+def current_api_key() -> str | None:
+    return _KEY_OVERRIDE or os.getenv("ANTHROPIC_API_KEY")
+
+
+# Politique « pas de repli anglais » posée par le pipeline (per-run). None → env.
+_REQUIRE_OVERRIDE: bool | None = None
+
+
+def set_require_llm(value: bool | None) -> None:
+    global _REQUIRE_OVERRIDE
+    _REQUIRE_OVERRIDE = value
+
+
+def _require_llm() -> bool:
+    if _REQUIRE_OVERRIDE is not None:
+        return _REQUIRE_OVERRIDE
+    return os.getenv("REQUIRE_LLM_SUMMARY") == "1"
+
+
 def ia_enabled() -> bool:
-    """Vrai seulement si une clé est présente ET le SDK anthropic est installé."""
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    """Vrai seulement si une clé est disponible (compte ou env) ET le SDK est installé."""
+    if not current_api_key():
         return False
     try:
         import anthropic  # noqa: F401
@@ -134,14 +164,44 @@ def ia_enabled() -> bool:
     return True
 
 
+# Modèles proposés au choix (réglage à chaud via /settings). Le premier est le défaut.
+MODEL_CHOICES = [
+    {"id": "claude-haiku-4-5-20251001", "label": "Haiku 4.5",
+     "hint": "rapide, le moins cher (~0,10 $/run)"},
+    {"id": "claude-sonnet-5", "label": "Sonnet 5",
+     "hint": "meilleur français (~0,35 $/run)"},
+]
+_DEFAULT_MODEL = MODEL_CHOICES[0]["id"]
+
+# Override runtime posé par le pipeline (db.get_setting) — sinon on lit ANTHROPIC_MODEL.
+_MODEL_OVERRIDE: str | None = None
+
+
+def set_model(model: str | None) -> None:
+    """Force le modèle Claude pour ce process (réglage choisi dans /settings)."""
+    global _MODEL_OVERRIDE
+    _MODEL_OVERRIDE = model or None
+
+
+def current_model() -> str:
+    """Modèle effectif : override runtime > ANTHROPIC_MODEL > défaut (Haiku)."""
+    return _MODEL_OVERRIDE or os.getenv("ANTHROPIC_MODEL") or _DEFAULT_MODEL
+
+
+def model_label(model_id: str) -> str:
+    """Libellé lisible d'un modèle (ex. 'Haiku 4.5'), sinon l'identifiant brut."""
+    return next((m["label"] for m in MODEL_CHOICES if m["id"] == model_id), model_id)
+
+
 _SCHEMA = {
     "type": "object",
     "properties": {
+        "title_fr": {"type": "string"},
         "summary": {"type": "string"},
         "takeaways": {"type": "array", "items": {"type": "string"}},
         "category": {"type": "string", "enum": DOMAINS},
     },
-    "required": ["summary", "takeaways", "category"],
+    "required": ["title_fr", "summary", "takeaways", "category"],
     "additionalProperties": False,
 }
 
@@ -151,17 +211,21 @@ def _ia_enrich(title: str, content: str, default: str | None) -> dict | None:
     try:
         import anthropic
 
-        client = anthropic.Anthropic()
-        model = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
+        client = anthropic.Anthropic(api_key=current_api_key())
+        model = current_model()
         user = f"Titre : {title}\n\nContenu :\n{strip_html(content)[:4000]}"
         resp = client.messages.create(
             model=model,
             max_tokens=700,
             system=(
                 "Tu es un assistant de veille technologique. À partir de l'article : "
-                "1) rédige un résumé de 2 à 3 phrases claires, en français ; "
-                "2) donne 3 à 4 points clés à retenir, en français, courts et concrets ; "
-                "3) classe l'article dans exactement un des domaines proposés. "
+                "1) traduis le TITRE en français naturel, en gardant TELS QUELS les noms "
+                "propres, noms de produits/d'entreprises, acronymes et versions "
+                "(ex. Anthropic, GPT-4, IBM Heron, arXiv) ; si le titre est déjà en "
+                "français, renvoie-le inchangé ; "
+                "2) rédige un résumé de 2 à 3 phrases claires, en français ; "
+                "3) donne 3 à 4 points clés à retenir, en français, courts et concrets ; "
+                "4) classe l'article dans exactement un des domaines proposés. "
                 "Tout le texte produit doit être en français."
             ),
             messages=[{"role": "user", "content": user}],
@@ -176,7 +240,9 @@ def _ia_enrich(title: str, content: str, default: str | None) -> dict | None:
         if category not in DOMAINS:
             category = default if default in DOMAINS else DOMAINS[0]
         takeaways = [t.strip() for t in (data.get("takeaways") or []) if t.strip()]
-        return {"summary": summary, "category": category, "takeaways": takeaways}
+        title_fr = (data.get("title_fr") or "").strip()
+        return {"title_fr": title_fr or None, "summary": summary,
+                "category": category, "takeaways": takeaways}
     except Exception as exc:  # fallback silencieux
         print(f"[ia] échec, bascule en mode dégradé : {exc}")
         return None

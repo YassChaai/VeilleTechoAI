@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProvider } from "@/components/session-provider";
+import { AuthGate } from "@/components/auth-gate";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <SessionProvider>
           <SiteHeader />
-          <main className="mx-auto w-full max-w-[900px] flex-1 px-5 pb-14 pt-7">{children}</main>
+          <main className="mx-auto w-full max-w-[900px] flex-1 px-5 pb-14 pt-7">
+            <AuthGate>{children}</AuthGate>
+          </main>
           <SiteFooter />
         </SessionProvider>
       </body>

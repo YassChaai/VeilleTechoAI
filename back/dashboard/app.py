@@ -19,7 +19,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ingestion import discovery
 from processing import digest as weekly_digest
-from processing import semantic_search, source_health, trends
+from processing import semantic_search, source_health, summarize, trends
 from processing.summarize import DOMAINS
 from storage import db
 
@@ -296,11 +296,40 @@ def _reset_ingest_state() -> None:
     })
 
 
-def _run_ingest() -> None:
-    """Relance le pipeline complet en tâche de fond, avec suivi de progression."""
+def _mask_key(key: str | None) -> str | None:
+    """Indice masqué d'une clé (jamais la clé complète côté client)."""
+    if not key:
+        return None
+    return f"…{key[-4:]}" if len(key) > 4 else "…"
+
+
+def _session_pipeline_kwargs(conn) -> dict:
+    """Paramètres du pipeline selon le compte déclencheur (BYOK) :
+      - clé présente        → mode Claude (api_key + modèle du compte) ;
+      - connecté sans clé    → mode gratuit : tente Ollama (FR), sinon extractif (EN) ;
+      - invité / build (CLI) → {} → valeurs d'environnement.
+    """
+    uid = _uid()
+    if not uid:
+        return {}
+    key = db.get_user_api_key(conn, uid)
+    if key:
+        return {"api_key": key, "model": db.get_user_model(conn, uid)}
+    return {"translate_backend": "auto", "require_llm": False}
+
+
+def _run_ingest(pipeline_kwargs=None) -> None:
+    """Relance le pipeline complet en tâche de fond, avec suivi de progression.
+
+    `pipeline_kwargs` : paramètres résolus depuis le compte déclencheur (voir
+    `_session_pipeline_kwargs`).
+    """
     import main  # import paresseux : évite d'exécuter le module au chargement de l'app
     try:
-        main.run_pipeline(on_progress=lambda info: _ingest_state.update(info))
+        main.run_pipeline(
+            on_progress=lambda info: _ingest_state.update(info),
+            **(pipeline_kwargs or {}),
+        )
     except Exception as exc:
         _ingest_state.update({"percent": 100, "phase": f"Erreur : {exc}"})
     finally:
@@ -311,15 +340,19 @@ def _run_ingest() -> None:
 @app.route("/articles/refresh", methods=["POST"])
 def articles_refresh():
     """Va chercher de nouveaux articles dans les sources existantes (ingestion + résumé)."""
+    conn = db.get_connection()
+    db.init_db(conn)
+    kwargs = _session_pipeline_kwargs(conn)
+    conn.close()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         if not _ingest_state["running"]:
             _reset_ingest_state()
             _ingest_state["running"] = True
             _ingest_state["phase"] = "Démarrage…"
-            threading.Thread(target=_run_ingest, daemon=True).start()
+            threading.Thread(target=_run_ingest, args=(kwargs,), daemon=True).start()
         return jsonify({"started": True})
     import main  # sans JS : exécution synchrone puis redirection
-    main.run_pipeline()
+    main.run_pipeline(**kwargs)
     return redirect(url_for("index"))
 
 
@@ -705,6 +738,21 @@ def api_meta():
         "domains": DOMAINS,
         "discovery_enabled": discovery.enabled(),
         "semantic": semantic_search.available(),
+        "ingest_running": _ingest_state["running"],
+    })
+
+
+@app.route("/api/ai-status")
+def api_ai_status():
+    """Ce que le serveur peut faire pour résumer (onboarding) : Ollama local détecté ?
+    modèles Claude proposés ? clé serveur présente ?"""
+    from processing import translate
+    st = translate.ollama_status()
+    return jsonify({
+        "ollama_available": st["available"],
+        "ollama_model": st["model"],
+        "has_env_key": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "models": summarize.MODEL_CHOICES,
     })
 
 
@@ -721,18 +769,30 @@ def api_register():
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
     confirm = data.get("confirm") or ""
+    key = (data.get("key") or "").strip()      # BYOK optionnel dès l'inscription
+    model = (data.get("model") or "").strip()  # modèle Claude choisi, optionnel
     if len(username) < 3:
         return jsonify({"error": "Le nom d'utilisateur doit faire au moins 3 caractères."}), 400
     if len(password) < 6:
         return jsonify({"error": "Le mot de passe doit faire au moins 6 caractères."}), 400
     if password != confirm:
         return jsonify({"error": "Les deux mots de passe ne correspondent pas."}), 400
+    if key and not key.startswith("sk-ant-"):
+        return jsonify({"error": "Clé API : format inattendu (elle commence par « sk-ant- »). "
+                                 "Laisse le champ vide pour l'ajouter plus tard."}), 400
+    if model and model not in {m["id"] for m in summarize.MODEL_CHOICES}:
+        return jsonify({"error": "Modèle inconnu."}), 400
     conn = db.get_connection()
     db.init_db(conn)
     uid = db.create_user(conn, username, generate_password_hash(password))
-    conn.close()
     if uid is None:
+        conn.close()
         return jsonify({"error": "Ce nom d'utilisateur est déjà pris."}), 400
+    if key:
+        db.set_user_api_key(conn, uid, key)
+    if model:
+        db.set_user_model(conn, uid, model)
+    conn.close()
     session.clear()
     session["user_id"] = uid
     session["username"] = username
@@ -929,10 +989,14 @@ def api_unsave(article_id: int):
 @app.route("/api/articles/refresh", methods=["POST"])
 def api_articles_refresh():
     if not _ingest_state["running"]:
+        conn = db.get_connection()
+        db.init_db(conn)
+        kwargs = _session_pipeline_kwargs(conn)  # BYOK : Claude / gratuit-Ollama selon le compte
+        conn.close()
         _reset_ingest_state()
         _ingest_state["running"] = True
         _ingest_state["phase"] = "Démarrage…"
-        threading.Thread(target=_run_ingest, daemon=True).start()
+        threading.Thread(target=_run_ingest, args=(kwargs,), daemon=True).start()
     return jsonify({"started": True})
 
 
@@ -1025,11 +1089,11 @@ def _reset_digest_gen() -> None:
                         "week": "", "error": None})
 
 
-def _run_digest_gen(week_start=None) -> None:
+def _run_digest_gen(week_start=None, pipeline_kwargs=None) -> None:
     try:
         conn = db.get_connection()
         db.init_db(conn)
-        row = weekly_digest.generate(conn, week_start)
+        row = weekly_digest.generate(conn, week_start, **(pipeline_kwargs or {}))
         conn.close()
         _digest_gen.update({"week": row["week_start"], "percent": 100, "phase": "Terminé"})
     except Exception as exc:
@@ -1071,10 +1135,14 @@ def api_digest_generate():
     """Rédige (en tâche de fond) le digest d'une semaine (défaut : la semaine courante)."""
     week = _payload().get("week_start") or None
     if not _digest_gen["running"]:
+        conn = db.get_connection()
+        db.init_db(conn)
+        kwargs = _session_pipeline_kwargs(conn)  # BYOK : Claude (clé compte) / gratuit-Ollama
+        conn.close()
         _reset_digest_gen()
         _digest_gen["running"] = True
         _digest_gen["phase"] = "Rédaction du digest…"
-        threading.Thread(target=_run_digest_gen, args=(week,), daemon=True).start()
+        threading.Thread(target=_run_digest_gen, args=(week, kwargs), daemon=True).start()
     return jsonify({"started": True})
 
 
@@ -1126,8 +1194,18 @@ def api_settings():
     db.init_db(conn)
     uid = _uid()
 
+    allowed_models = {m["id"] for m in summarize.MODEL_CHOICES}
+
     if request.method == "POST":
         data = _payload()
+        # Modèle Claude, appliqué au prochain « Chercher de nouveaux articles » sans
+        # redéploiement. Per-compte si connecté (BYOK), sinon réglage global (invité).
+        model = (data.get("model") or "").strip()
+        if model in allowed_models:
+            if uid:
+                db.set_user_model(conn, uid, model)
+            else:
+                db.set_setting(conn, "anthropic_model", model)
         keywords = (data.get("keywords") or "").strip()
         if uid:
             hide_read = bool(data.get("hide_read"))
@@ -1144,8 +1222,23 @@ def api_settings():
     else:
         keywords = db.get_profile_keywords(conn)
         hide_read = False
+    # Modèle affiché : celui du compte (BYOK) prime, sinon réglage global, sinon défaut.
+    user_key = db.get_user_api_key(conn, uid) if uid else None
+    model = (db.get_user_model(conn, uid) if uid else None) \
+        or db.get_setting(conn, "anthropic_model") or summarize.current_model()
+    # IA dispo si le compte connecté a sa clé (BYOK) OU si le serveur en a une (env).
+    ia_enabled = bool(user_key or os.getenv("ANTHROPIC_API_KEY"))
     conn.close()
-    return jsonify({"keywords": keywords, "hide_read": hide_read, "logged_in": bool(uid)})
+    return jsonify({
+        "keywords": keywords,
+        "hide_read": hide_read,
+        "logged_in": bool(uid),
+        "model": model,
+        "models": summarize.MODEL_CHOICES,
+        "ia_enabled": ia_enabled,
+        "has_api_key": bool(user_key),
+        "api_key_hint": _mask_key(user_key),
+    })
 
 
 @app.route("/api/account")
@@ -1156,12 +1249,39 @@ def api_account():
     uid = _uid()
     user = db.get_user(conn, uid)
     stats = _account_stats(conn, uid)
+    key = db.get_user_api_key(conn, uid)
     conn.close()
     return jsonify({
         "user": {"id": user["id"], "username": user["username"],
                  "created_at": user["created_at"]},
         "stats": stats,
+        "has_api_key": bool(key),
+        "api_key_hint": _mask_key(key),
     })
+
+
+@app.route("/api/account/apikey", methods=["POST", "DELETE"])
+@_api_login_required
+def api_account_apikey():
+    """BYOK : clé Claude perso du compte. Jamais renvoyée en clair (indice masqué)."""
+    uid = _uid()
+    conn = db.get_connection()
+    db.init_db(conn)
+    if request.method == "DELETE":
+        db.set_user_api_key(conn, uid, None)
+        conn.close()
+        return jsonify({"ok": True, "has_api_key": False, "api_key_hint": None})
+    key = (_payload().get("key") or "").strip()
+    if not key:
+        conn.close()
+        return jsonify({"error": "Clé vide."}), 400
+    if not key.startswith("sk-ant-"):
+        conn.close()
+        return jsonify({"error": "Format inattendu : une clé Anthropic commence par « sk-ant- »."}), 400
+    db.set_user_api_key(conn, uid, key)
+    hint = _mask_key(key)
+    conn.close()
+    return jsonify({"ok": True, "has_api_key": True, "api_key_hint": hint})
 
 
 @app.route("/api/account/password", methods=["POST"])

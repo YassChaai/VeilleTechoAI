@@ -37,6 +37,23 @@ export interface ArticlesResponse {
   sort: string;
 }
 
+export interface ModelChoice {
+  id: string;
+  label: string;
+  hint: string;
+}
+
+export interface SettingsResponse {
+  keywords: string;
+  hide_read: boolean;
+  logged_in: boolean;
+  model: string;
+  models: ModelChoice[];
+  ia_enabled: boolean;
+  has_api_key: boolean;
+  api_key_hint: string | null;
+}
+
 export interface ArticleDetail {
   article: Article;
   duplicates: { source: string; url: string; title: string }[];
@@ -122,6 +139,14 @@ export interface Meta {
   domains: string[];
   discovery_enabled: boolean;
   semantic: boolean;
+  ingest_running: boolean;
+}
+
+export interface AiStatus {
+  ollama_available: boolean;
+  ollama_model: string;
+  has_env_key: boolean;
+  models: ModelChoice[];
 }
 
 export interface JobStatus {
@@ -144,6 +169,8 @@ export interface JobStatus {
 export interface AccountResponse {
   user: { id: number; username: string; created_at: string };
   stats: { read: number; saved: number; folders: number };
+  has_api_key: boolean;
+  api_key_hint: string | null;
 }
 
 export class ApiError extends Error {
@@ -183,6 +210,7 @@ const qs = (params: Record<string, string | undefined>) => {
 
 export const api = {
   meta: () => request<Meta>("/meta"),
+  aiStatus: () => request<AiStatus>("/ai-status"),
   session: () => request<{ user: SessionUser | null }>("/session"),
 
   login: (username: string, password: string) =>
@@ -190,10 +218,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
-  register: (username: string, password: string, confirm: string) =>
+  register: (
+    username: string,
+    password: string,
+    confirm: string,
+    key?: string,
+    model?: string,
+  ) =>
     request<{ user: SessionUser }>("/register", {
       method: "POST",
-      body: JSON.stringify({ username, password, confirm }),
+      body: JSON.stringify({ username, password, confirm, key, model }),
     }),
   logout: () => request<{ ok: boolean }>("/logout", { method: "POST" }),
 
@@ -238,15 +272,24 @@ export const api = {
   sourcesRefresh: () => request<{ started: boolean }>("/sources/refresh", { method: "POST" }),
   sourcesStatus: () => request<JobStatus>("/sources/refresh/status"),
 
-  getSettings: () =>
-    request<{ keywords: string; hide_read: boolean; logged_in: boolean }>("/settings"),
-  saveSettings: (keywords: string, hide_read: boolean) =>
+  getSettings: () => request<SettingsResponse>("/settings"),
+  saveSettings: (keywords: string, hide_read: boolean, model?: string) =>
     request<{ ok: boolean }>("/settings", {
       method: "POST",
-      body: JSON.stringify({ keywords, hide_read }),
+      body: JSON.stringify({ keywords, hide_read, model }),
     }),
 
   account: () => request<AccountResponse>("/account"),
+  setApiKey: (key: string) =>
+    request<{ ok: boolean; has_api_key: boolean; api_key_hint: string | null }>(
+      "/account/apikey",
+      { method: "POST", body: JSON.stringify({ key }) },
+    ),
+  removeApiKey: () =>
+    request<{ ok: boolean; has_api_key: boolean; api_key_hint: string | null }>(
+      "/account/apikey",
+      { method: "DELETE" },
+    ),
   changePassword: (current: string, newPassword: string, confirm: string) =>
     request<{ ok: boolean }>("/account/password", {
       method: "POST",

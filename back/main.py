@@ -53,10 +53,18 @@ def load_sources(conn=None) -> list[dict]:
     return sources
 
 
-def run_pipeline(on_progress=None) -> None:
+def run_pipeline(on_progress=None, api_key=None, model=None,
+                 translate_backend=None, require_llm=None) -> None:
     """Pipeline complet. `on_progress` : callback optionnel {phase, percent, ingested,
     summarized} pour alimenter une barre de progression (bouton « Chercher de nouveaux
-    articles » du dashboard)."""
+    articles » du dashboard).
+
+    Selon le compte déclencheur (BYOK) :
+      - `api_key` / `model` : clé + modèle Claude (mode « Claude ») ;
+      - `translate_backend` : force le backend de traduction (ex. 'auto' → tente Ollama
+        pour le mode gratuit) ;
+      - `require_llm` : False → autorise le repli extractif (anglais) ; True → pas d'anglais.
+    None → valeurs d'environnement (utilisé au build sans utilisateur)."""
 
     def emit(phase: str, percent: float, **extra) -> None:
         if on_progress:
@@ -122,7 +130,15 @@ def run_pipeline(on_progress=None) -> None:
     #    Borné par run (idempotent : relancer traite le reste) et concurrent : les
     #    appels LLM sont lents mais bornés réseau/GPU. Les écritures SQLite restent
     #    sur le thread principal (connexion mono-thread) via as_completed.
+    # Clé Claude : celle passée par l'appelant (BYOK, clé du compte qui déclenche le
+    # refresh) prime ; None → retombe sur ANTHROPIC_API_KEY (env).
+    summarize.set_api_key(api_key)
+    summarize.set_require_llm(require_llm)
+    translate.set_backend_override(translate_backend)
     ia = summarize.ia_enabled()
+    # Modèle : celui du compte (BYOK) prime, sinon réglage global, sinon ANTHROPIC_MODEL/défaut.
+    if ia:
+        summarize.set_model(model or db.get_setting(conn, "anthropic_model"))
     # Garde-fou coût : on plafonne seulement en mode IA (Claude, payant). En mode
     # dégradé (LLM local gratuit), on traite TOUT le backlog en attente.
     if ia:
@@ -162,6 +178,10 @@ def run_pipeline(on_progress=None) -> None:
                 db.update_enrichment(
                     conn, art["id"], res["summary"], res["category"], res["takeaways"]
                 )
+                # Mode IA (Claude) : le titre FR est produit dans le même appel → on le
+                # stocke ici. En mode dégradé (pas de title_fr), la phase 3c s'en charge.
+                if res.get("title_fr"):
+                    db.update_title_fr(conn, art["id"], res["title_fr"])
                 print(f"[résumé]   {done}/{total}  ✓  {art['title'][:55]}", flush=True)
                 emit(f"Résumé {done}/{total}", 45 + 45 * done / total,
                      ingested=inserted, summarized=done)

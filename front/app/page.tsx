@@ -72,6 +72,8 @@ export default function ArticlesPage() {
     start: api.ingestRefresh,
     poll: api.ingestStatus,
     onDone: () => load(),
+    // Reprend l'ingestion déjà lancée (ex. juste après l'inscription).
+    initialRunning: meta?.ingest_running,
   });
 
   const st = ingest.status;
