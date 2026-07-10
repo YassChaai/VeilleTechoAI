@@ -70,7 +70,7 @@ export default function DigestPage() {
       {gen.running && (
         <div className="mb-6 flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          {gen.status?.phase || "Rédaction du digest en cours…"} (le modèle local peut prendre 1 à
+          {gen.status?.phase || "Rédaction du digest en cours…"} (la rédaction peut prendre 1 à
           2 minutes)
         </div>
       )}
@@ -136,8 +136,7 @@ export default function DigestPage() {
         <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
           <p>Aucun digest pour l&apos;instant.</p>
           <p className="mt-1 text-sm">
-            Clique sur « Générer cette semaine » pour rédiger le premier (Ollama démarré), ou côté
-            back :{" "}
+            Clique sur « Générer cette semaine » pour rédiger le premier, ou côté back :{" "}
             <code className="rounded bg-secondary px-1.5 py-0.5 font-mono">python main.py digest</code>
           </p>
         </div>

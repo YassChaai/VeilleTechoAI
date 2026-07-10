@@ -60,7 +60,7 @@ export default function SourcesPage() {
         </Button>
       </div>
       <p className="mb-5 text-[13px] text-muted-foreground">
-        Socle imposé (5 sources justifiées) + découvertes autonomes (recherche web + LLM local),
+        Socle imposé (5 sources justifiées) + découvertes autonomes (recherche web),
         validées, notées et auto-élaguées.
         {!discoveryOn && " — Découverte désactivée (SOURCE_DISCOVERY=1 pour l'activer)."}
       </p>

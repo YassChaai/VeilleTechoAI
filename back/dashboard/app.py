@@ -749,7 +749,9 @@ def api_ai_status():
     from processing import translate
     st = translate.ollama_status()
     return jsonify({
-        "ollama_available": st["available"],
+        "ollama_up": st["up"],                # daemon Ollama joignable
+        "ollama_has_model": st["has_model"],  # modèle requis téléchargé
+        "ollama_available": st["available"],  # prêt = daemon + modèle
         "ollama_model": st["model"],
         "has_env_key": bool(os.getenv("ANTHROPIC_API_KEY")),
         "models": summarize.MODEL_CHOICES,

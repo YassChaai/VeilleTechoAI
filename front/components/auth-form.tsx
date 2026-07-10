@@ -34,7 +34,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Ce que le serveur peut faire (Ollama détecté ? modèles Claude ?) pour l'étape 2.
+  // Modèles Claude proposés à l'étape 2.
   useEffect(() => {
     if (!isRegister) return;
     api
@@ -253,27 +253,15 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             >
               <div className="text-[14px] font-semibold">Gratuit, sans clé</div>
               <div className="text-xs text-muted-foreground">
-                {ai?.ollama_available
-                  ? `Ollama détecté (${ai.ollama_model}) → résumés en français, gratuits et locaux.`
-                  : "Sans LLM local, les résumés seront en anglais (extractif)."}
+                Résumés extractifs automatiques — qualité réduite, souvent en anglais.
               </div>
             </button>
 
-            {aiMode === "free" && !ai?.ollama_available && (
+            {aiMode === "free" && (
               <p className="rounded-md border border-border bg-secondary px-3 py-2 text-xs text-muted-foreground">
-                ⚠️ Les résumés seront <strong>en anglais</strong>. Pour du français gratuit,
-                installe{" "}
-                <a
-                  href="https://ollama.com/download"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary"
-                >
-                  Ollama
-                </a>{" "}
-                sur la machine qui exécute le pipeline, puis lance{" "}
-                <code className="font-mono">ollama pull {ai?.ollama_model ?? "llama3.2:3b"}</code>{" "}
-                — il sera détecté automatiquement.
+                ⚠️ Sans clé, les résumés et les titres restent <strong>basiques</strong> et
+                souvent <strong>en anglais</strong>. Tu pourras ajouter une clé Claude plus tard
+                dans <strong>Réglages</strong> pour passer au français.
               </p>
             )}
 

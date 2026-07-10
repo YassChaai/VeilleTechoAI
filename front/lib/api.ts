@@ -143,9 +143,6 @@ export interface Meta {
 }
 
 export interface AiStatus {
-  ollama_available: boolean;
-  ollama_model: string;
-  has_env_key: boolean;
   models: ModelChoice[];
 }
 

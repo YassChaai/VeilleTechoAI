@@ -42,8 +42,24 @@ def set_backend_override(name: str | None) -> None:
 
 
 def ollama_status() -> dict:
-    """État d'Ollama, indépendant de TRANSLATE_BACKEND (pour l'onboarding)."""
-    return {"available": _ollama_up(), "model": OLLAMA_MODEL, "host": OLLAMA_HOST}
+    """État d'Ollama pour l'onboarding, indépendant de TRANSLATE_BACKEND :
+    daemon joignable ? modèle requis (OLLAMA_MODEL) réellement installé ?
+
+    On interroge `GET /api/tags` (la liste des modèles téléchargés). `available`
+    n'est vrai que si le daemon répond ET que le modèle est présent."""
+    up = has_model = False
+    try:
+        r = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=4)
+        if r.ok:
+            up = True
+            names = [m.get("name", "") for m in (r.json().get("models") or [])]
+            # tolère l'absence de tag (ex. "llama3.2" ↔ "llama3.2:latest")
+            base = OLLAMA_MODEL.split(":")[0]
+            has_model = any(n == OLLAMA_MODEL or n.split(":")[0] == base for n in names)
+    except requests.RequestException:
+        pass
+    return {"up": up, "has_model": has_model, "available": up and has_model,
+            "model": OLLAMA_MODEL, "host": OLLAMA_HOST}
 
 
 def _ollama_up() -> bool:
